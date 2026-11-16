@@ -51,7 +51,8 @@ let old = Config.load(Data(#"{"selected":"Rain","liveLock":true,"fps":30}"#.utf8
 precondition(old.selected == "Rain" && old.fps == 30 && old.matchSystem && old.places.isEmpty, "older config must still load")
 precondition(Config.load(Data("junk".utf8)) == Config())
 
-// Live Photo: the photo's maker note and the movie's metadata must carry the same identifier, plus the still-image-time track.
+// Live Photo: the photo's maker note and the movie's metadata must carry the same identifier, and the movie must have
+// what iOS wants before it animates a wallpaper: 60 fps and the camera's three timed metadata items.
 let files = try Export.livePhoto(Config(), wallpapers[0], size: CGSize(width: 320, height: 480), to: URL(fileURLWithPath: "build/snapshots/live-test"), seconds: 1)
 let props = CGImageSourceCopyPropertiesAtIndex(CGImageSourceCreateWithURL(files[0] as CFURL, nil)!, 0, nil) as! [CFString: Any]
 let photoID = (props[kCGImagePropertyMakerAppleDictionary] as? [String: Any])?["17"] as? String
@@ -59,7 +60,13 @@ let movie = AVURLAsset(url: files[1])
 let ids = AVMetadataItem.metadataItems(from: try await movie.load(.metadata), filteredByIdentifier: .quickTimeMetadataContentIdentifier)
 let videoID = try await ids.first?.load(.stringValue)
 precondition(photoID != nil && photoID == videoID, "Live Photo pair does not share an identifier: \(photoID ?? "nil") / \(videoID ?? "nil")")
-let stillTracks = try await movie.loadTracks(withMediaType: .metadata).count
+var timed: Set<String> = []
+for track in try await movie.loadTracks(withMediaType: .metadata) {
+    for format in try await track.load(.formatDescriptions) { timed.formUnion((CMMetadataFormatDescriptionGetIdentifiers(format) as? [String]) ?? []) }
+}
+let wanted = ["live-photo-info", "live-photo-still-image-transform", "still-image-time"].map { "mdta/com.apple.quicktime." + $0 }
+precondition(timed == Set(wanted), "Live Photo movie has timed metadata \(timed)")
+let rate = try await movie.loadTracks(withMediaType: .video)[0].load(.nominalFrameRate)
 let seconds = try await movie.load(.duration).seconds
-precondition(stillTracks == 1 && abs(seconds - 1) < 0.1, "Live Photo movie: \(stillTracks) metadata tracks, \(seconds) s")
-print("ok: \(wallpapers.count) wallpapers render, settings load, Live Photo pair matches")
+precondition(abs(rate - 60) < 0.5 && abs(seconds - 1) < 0.1, "Live Photo movie: \(rate) fps, \(seconds) s")
+print("ok: \(wallpapers.count) wallpapers render, settings load, Live Photo has what iOS wallpapers need")

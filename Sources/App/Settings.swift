@@ -75,7 +75,7 @@ struct WallpaperView: View {
                             }
                         }
                     }
-                    Text("Makes a 3-second Live Photo of this wallpaper with the settings above. Add it to Photos (iCloud Photos carries it to your iPhone and Watch) or AirDrop both files together, then set it as the iPhone wallpaper or choose it for a Photos watch face.")
+                    Text("Makes a short Live Photo of this wallpaper with the settings above. Press Add to Photos: iCloud Photos carries it to your iPhone and Watch (or AirDrop it from the Photos app). Sending the two files on their own gives a plain photo and a movie, not a Live Photo. On the iPhone, pick it as Lock Screen wallpaper and turn the Live button on.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {

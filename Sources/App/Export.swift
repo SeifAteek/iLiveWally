@@ -47,7 +47,12 @@ enum Export {
     static func write(_ buffer: CVPixelBuffer, to url: URL, type: UTType, properties: [CFString: Any] = [:]) throws {
         var image: CGImage?
         VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &image)
-        guard let image, let dest = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil) else { throw CocoaError(.fileWriteUnknown) }
+        guard let image else { throw CocoaError(.fileWriteUnknown) }
+        try write(image, to: url, type: type, properties: properties)
+    }
+
+    static func write(_ image: CGImage, to url: URL, type: UTType, properties: [CFString: Any] = [:]) throws {
+        guard let dest = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil) else { throw CocoaError(.fileWriteUnknown) }
         CGImageDestinationAddImage(dest, image, properties as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { throw CocoaError(.fileWriteUnknown) }
     }
@@ -80,6 +85,8 @@ enum Export {
         writer.metadata = [item("content.identifier", id as NSString, kCMMetadataBaseDataType_UTF8 as String)]
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.hevc, AVVideoWidthKey: size.width, AVVideoHeightKey: size.height,
+            AVVideoColorPropertiesKey: [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2, AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                                        AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2],
             AVVideoCompressionPropertiesKey: [AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel, AVVideoExpectedSourceFrameRateKey: fps,
                                               AVVideoAllowFrameReorderingKey: false], // like the camera: no B-frames
         ])
@@ -118,7 +125,6 @@ enum Export {
             guard adaptor.append(buffer, withPresentationTime: range.start),
                   infoTrack.append(AVTimedMetadataGroup(items: [item("live-photo-info", infoSample as NSData, infoType)], timeRange: range))
             else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
-            if i == 0 { try write(buffer, to: photo, type: .heic, properties: [kCGImagePropertyMakerAppleDictionary: ["17": id]]) }
         }
         // As the camera writes it: the still-image marker (-1) with an identity transform, 250 ticks in.
         let identity = [1, 0, 0, 0, 1, 0, 0, 0, 1].map { NSNumber(value: Double($0)) } as NSArray
@@ -131,6 +137,11 @@ enum Export {
         writer.finishWriting { done.signal() }
         done.wait()
         if writer.status != .completed { throw writer.error ?? CocoaError(.fileWriteUnknown) }
+        // The photo is the movie's opening frame as decoded, not the frame before encoding: iOS refuses motion when they differ.
+        let frames0 = AVAssetImageGenerator(asset: AVURLAsset(url: video))
+        frames0.requestedTimeToleranceBefore = .zero
+        frames0.requestedTimeToleranceAfter = .zero
+        try write(try frames0.copyCGImage(at: .zero, actualTime: nil), to: photo, type: .heic, properties: [kCGImagePropertyMakerAppleDictionary: ["17": id]])
         return [photo, video]
     }
 

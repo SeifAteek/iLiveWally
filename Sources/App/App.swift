@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settings: NSWindow?
     private let audio = SystemAudio()
     private var audioStarted = false
+    private var missionControl = false
     private var subs: Set<AnyCancellable> = []
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -60,6 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in self?.lock() }
         dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in store.cfg.locked = false; SystemWallpaper.sync() }
         store.$cfg.receive(on: RunLoop.main).sink { [weak self] in self?.apply($0) }.store(in: &subs)
+        // macOS posts nothing when Mission Control opens, so look for it twice a second, only while the focus pause is holding the wallpaper.
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self, store.cfg.pauseUnfocused else { return }
+            let now = Self.missionControlIsOpen()
+            if now != self.missionControl { self.missionControl = now; self.apply(store.cfg) }
+        }
         store.$cfg.debounce(for: .seconds(1), scheduler: RunLoop.main).sink { _ in SystemWallpaper.sync() }.store(in: &subs) // not on every slider tick
 
         // Started by macOS at login: stay in the menu bar. Started by the user: show the settings.
@@ -95,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing is drawn while paused or while other windows cover the whole desktop.
         // Optionally also whenever an app other than Finder is in front (our own settings window keeps it running).
         let front = NSWorkspace.shared.frontmostApplication
-        let away = c.pauseUnfocused && front?.bundleIdentifier != "com.apple.finder" && front != .current
+        let away = c.pauseUnfocused && front?.bundleIdentifier != "com.apple.finder" && front != .current && !missionControl
         for w in walls { (w.contentView as? WallView)?.isPaused = c.paused || away || !w.occlusionState.contains(.visible) }
         // The audio tap asks for permission, so it only starts once a music-reactive wallpaper is on a display.
         if !audioStarted, NSScreen.screens.contains(where: { c.wallpaper($0.key).reactive }) {
@@ -120,6 +127,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard store.cfg.saverOnLock, Saver.isChosen else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { // not if a quick Touch ID already unlocked it
             if store.cfg.locked { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Library/CoreServices/ScreenSaverEngine.app")) }
+        }
+    }
+
+    /// While Mission Control is open, WindowManager shows a full-screen window above the desktop (layer 19 on macOS 27).
+    static func missionControlIsOpen() -> Bool {
+        let sizes = Set(NSScreen.screens.map { "\(Int($0.frame.width))x\(Int($0.frame.height))" })
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        return list.contains { w in
+            guard w["kCGWindowOwnerName"] as? String == "WindowManager", (w["kCGWindowLayer"] as? Int ?? 0) > 0,
+                  let b = w["kCGWindowBounds"] as? [String: Double], let width = b["Width"], let height = b["Height"] else { return false }
+            return sizes.contains("\(Int(width))x\(Int(height))")
         }
     }
 

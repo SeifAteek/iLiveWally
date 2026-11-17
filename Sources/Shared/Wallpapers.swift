@@ -102,6 +102,7 @@ struct Config: Codable, Equatable {
     var renderScale: Float = 1
     var gain: Float = 1
     var paused = false
+    var pauseUnfocused = false              // draw only while the desktop (Finder) is in front
     var matchSystem = true                  // keep the macOS wallpaper a still of the live one
     var saverOnLock = true                  // start the screen saver the moment the Mac locks
     var locked = false                      // set by the app while the screen is locked: the saver then shows the "lock" wallpaper

@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nc.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in self?.rebuild(); SystemWallpaper.sync() }
         nc.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] _ in self?.apply(store.cfg) }
         // setDesktopImageURL only reaches the Space on screen, so each Space is matched as it comes up.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in self?.apply(store.cfg) }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { _ in SystemWallpaper.sync() }
         dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in self?.lock() }
         dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in store.cfg.locked = false; SystemWallpaper.sync() }
@@ -92,7 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func apply(_ c: Config) {
         // Nothing is drawn while paused or while other windows cover the whole desktop.
-        for w in walls { (w.contentView as? WallView)?.isPaused = c.paused || !w.occlusionState.contains(.visible) }
+        // Optionally also whenever an app other than Finder is in front (our own settings window keeps it running).
+        let front = NSWorkspace.shared.frontmostApplication
+        let away = c.pauseUnfocused && front?.bundleIdentifier != "com.apple.finder" && front != .current
+        for w in walls { (w.contentView as? WallView)?.isPaused = c.paused || away || !w.occlusionState.contains(.visible) }
         // The audio tap asks for permission, so it only starts once a music-reactive wallpaper is on a display.
         if !audioStarted, NSScreen.screens.contains(where: { c.wallpaper($0.key).reactive }) {
             audioStarted = true

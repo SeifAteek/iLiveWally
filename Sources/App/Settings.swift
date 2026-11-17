@@ -164,11 +164,12 @@ struct EngineView: View {
                 }
                 SliderRow(name: "Render Scale", value: $store.cfg.renderScale, range: 0.25...1)
                 Toggle("Pause Wallpaper", isOn: $store.cfg.paused)
+                Toggle("Pause When the Desktop Is Not in Focus", isOn: $store.cfg.pauseUnfocused)
                 Toggle("Launch at Login", isOn: Binding(get: { login }, set: { on in
                     do { try on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister(); login = on }
                     catch { status = error.localizedDescription }
                 }))
-                note("Drawing stops by itself whenever windows cover the whole desktop.")
+                note("Drawing always stops while windows cover the whole desktop. The focus option also stops it whenever an app other than Finder is in front, which saves the most power; the wallpaper then holds its last frame.")
             }
             Section("Music") {
                 SliderRow(name: "Input Gain", value: $store.cfg.gain, range: 0.2...3)

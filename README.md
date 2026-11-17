@@ -25,7 +25,7 @@ Every wallpaper has its own sliders and colors, plus shared Speed, Brightness, C
 - **Lock screen.** macOS paints the lock screen from its own wallpaper and lets no app window sit behind the clock. So the app keeps the macOS wallpaper set to a still of the live one, and starts the screen saver when the Mac locks. macOS draws the clock over the screen saver.
 - **Matching menu bar.** The still also makes macOS tint the menu bar to match.
 - **Live Photos.** One button makes a Live Photo sized for iPhone or Apple Watch and can add it to Photos.
-- **Light on the Mac.** Drawing stops when windows cover the desktop. Frame rate and render scale are adjustable.
+- **Light on the Mac.** Drawing stops when windows cover the desktop, and optionally whenever the desktop is not in focus. Frame rate and render scale are adjustable.
 
 ## Build
 

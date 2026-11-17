@@ -41,7 +41,7 @@ final class Offscreen {
 }
 
 enum Export {
-    static let devices: [(name: String, size: CGSize)] = [("iPhone", CGSize(width: 1290, height: 2796)), ("Apple Watch", CGSize(width: 820, height: 1004))]
+    static let devices: [(name: String, size: CGSize)] = [("iPhone", CGSize(width: 1080, height: 2340)), ("Apple Watch", CGSize(width: 820, height: 1004))]
     static let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0].appendingPathComponent("iLiveWally")
 
     static func write(_ buffer: CVPixelBuffer, to url: URL, type: UTType, properties: [CFString: Any] = [:]) throws {
@@ -80,7 +80,8 @@ enum Export {
         writer.metadata = [item("content.identifier", id as NSString, kCMMetadataBaseDataType_UTF8 as String)]
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.hevc, AVVideoWidthKey: size.width, AVVideoHeightKey: size.height,
-            AVVideoCompressionPropertiesKey: [AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel, AVVideoExpectedSourceFrameRateKey: fps],
+            AVVideoCompressionPropertiesKey: [AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel, AVVideoExpectedSourceFrameRateKey: fps,
+                                              AVVideoAllowFrameReorderingKey: false], // like the camera: no B-frames
         ])
         input.mediaTimeScale = tick
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
